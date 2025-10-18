@@ -1,0 +1,37 @@
+# Flask 核心框架
+Flask==3.0.3
+
+# 数据库相关
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.7
+
+# 邮件服务
+Flask-Mailing==0.2.8
+
+# RESTful API
+Flask-RESTful==0.3.10
+
+# 异步任务队列
+celery==5.4.0
+
+# Redis 客户端（Celery broker/backend）
+redis==5.0.8
+
+# 环境变量管理
+python-dotenv==1.0.1
+
+# WSGI 服务器（生产环境）
+gunicorn==22.0.0
+
+# 依赖库（自动安装，但明确列出以确保版本）
+Werkzeug==3.0.3
+Jinja2==3.1.4
+click==8.1.7
+itsdangerous==2.2.0
+MarkupSafe==2.1.5
+
+# 异步支持
+aiosmtplib==3.0.2
+
+# 类型提示（Python 3.9+ 内置，但明确列出）
+typing-extensions==4.12.2
