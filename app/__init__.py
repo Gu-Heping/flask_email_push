@@ -8,7 +8,7 @@ from .extensions import db, migrate, mail  # 导入数据库扩展
 # from .yuque import yuque_bp
 # 假设您还使用 Flask-SocketIO 扩展
 
-
+# 创建 Celery 实例的函数
 from celery import Celery
 
 celery = Celery()  # 全局 Celery 实例
