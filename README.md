@@ -1,121 +1,300 @@
-# Flask 推送服务 - 邮件模块
+# Flask 异步推送服务平台
 
-> 注：本文档由AI生成，部分内容可能不符合实际情况，有疑问可以直接来问我
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
+[![Flask](https://img.shields.io/badge/Flask-3.1.2-green.svg)](https://flask.palletsprojects.com/)
+[![Celery](https://img.shields.io/badge/Celery-5.5.3-success.svg)](https://docs.celeryproject.org/)
+[![Redis](https://img.shields.io/badge/Redis-7.x-red.svg)](https://redis.io/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
----
-
-> 基于 Flask + Celery + Redis 的多渠道推送平台（开发中）  
-> 本人负责：**邮件推送模块**（Email Push Service）
-
----
-
-## 项目概述
-
-本项目旨在构建一个可扩展的消息推送平台，支持多种推送渠道：
-
-- **邮件推送**（Email）✅ 已实现
-- **更多渠道**（可扩展）
-
-当前进度：**邮件推送模块已完成核心功能**，包括异步任务、签名校验、失败重试与简易 DLQ。
+> 基于 Flask + Celery + Redis 的企业级异步消息推送平台
 
 ---
 
-## 技术栈
+## 📖 项目简介
 
-| 组件 | 技术 | 说明 |
-|------|------|------|
-| **Web 框架** | Flask 3.x | 轻量级 WSGI 框架 |
-| **任务队列** | Celery 5.x | 异步任务处理 |
-| **消息代理** | Redis 7.x | Celery broker & result backend |
-| **数据库** | SQLite（开发）| 通知记录存储（可迁移至 PostgreSQL） |
-| **邮件服务** | Flask-Mailing | 异步邮件发送（支持 SMTP） |
-| **API 风格** | RESTful | Flask-RESTful + 原生路由 |
+一个可扩展的异步消息推送服务平台，支持多渠道推送、任务队列、失败重试和死信队列（DLQ）等企业级特性。
+
+### ✨ 核心特性
+
+- ✅ **邮件推送** - 基于 SMTP 的异步邮件发送服务
+- 🔐 **签名验证** - HMAC-SHA256 签名 + 时间戳防重放攻击
+- ⚡ **异步任务** - Celery 分布式任务队列
+- 🔄 **智能重试** - 指数退避 + 抖动机制，最多重试 5 次
+- 💀 **死信队列** - 失败任务自动进入 DLQ，便于后续处理
+- 📊 **通知记录** - SQLAlchemy ORM 持久化存储
+- 🔌 **可扩展** - 模块化设计，支持快速添加新的推送渠道
+
+### 🎯 应用场景
+
+- 用户注册/登录通知
+- 订单状态变更提醒
+- 系统告警与监控
+- 营销活动推送
+- Webhook 事件转发
 
 ---
 
-## 项目结构
+## 🏗️ 技术栈
+
+| 组件 | 技术 | 版本 | 说明 |
+|------|------|------|------|
+| **Web 框架** | Flask | 3.1.2 | 轻量级 WSGI 框架 |
+| **任务队列** | Celery | 5.5.3 | 分布式异步任务处理 |
+| **消息代理** | Redis | 3.5.3 | Celery broker & result backend |
+| **数据库** | SQLite / PostgreSQL | - | 通知记录存储（开发环境使用 SQLite） |
+| **ORM** | SQLAlchemy | 2.0.44 | 数据库 ORM |
+| **邮件服务** | Flask-Mailing | 0.2.3 | 异步邮件发送（支持 SMTP） |
+| **数据库迁移** | Flask-Migrate | 4.1.0 | Alembic 数据库迁移工具 |
+| **API 框架** | Flask-RESTful | 0.3.10 | RESTful API 支持 |
+
+---
+
+## 📁 项目结构
 
 ```
 flask_test/
 ├── app/
-│   ├── __init__.py           # Flask 应用工厂 + Celery 初始化
-│   ├── config.py             # 统一配置（数据库、Celery、邮件、签名密钥）
-│   ├── extensions.py         # 扩展实例（db, migrate, mail）
-│   ├── email_service/        # 邮件推送模块 ✅
+│   ├── __init__.py              # Flask 应用工厂 + Celery 初始化
+│   ├── config.py                # 统一配置（数据库、Celery、邮件、签名密钥）
+│   ├── extensions.py            # Flask 扩展实例（db, migrate, mail）
+│   │
+│   ├── email_service/           # 📧 邮件推送模块（核心功能）
+│   │   ├── __init__.py          # 蓝图注册
+│   │   ├── routes.py            # API 路由（POST /api/v1/push/email）
+│   │   └── models.py            # 数据模型（EmailNotification）
+│   │
+│   ├── notification/            # 🔔 通知管理模块
 │   │   ├── __init__.py
-│   │   ├── routes.py         # POST /api/v1/push/email
-│   │   └── models.py
-│   ├── notification/         # 通知管理模块（开发中）
-│   │   ├── routes.py         # POST /api/v1/notifications
-│   │   └── models.py
-│   ├── tasks/                # Celery 任务
-│   │   ├── email_tasks.py    # send_email 任务（带重试 & DLQ）
-│   │   └── other_tasks.py
-│   ├── main/                 # 主页蓝图
-│   ├── yuque/                # 语雀集成（规划中）
-│   └── test/                 # 测试模块
-├── static/                   # 静态资源
-├── templates/                # 模板文件
-├── run.py                    # Flask 启动入口
-├── celery_worker.py          # Celery Worker 启动入口
-├── test_mail.py              # 邮件功能本地测试脚本
-├── requirements.txt          # 依赖清单（待补充）
-└── README.md                 # 本文档
+│   │   ├── routes.py            # 通知查询接口
+│   │   └── models.py            # 通知数据模型
+│   │
+│   ├── tasks/                   # ⚙️ Celery 异步任务
+│   │   ├── __init__.py
+│   │   ├── email_tasks.py       # 邮件发送任务（带重试 & DLQ）
+│   │   └── other_tasks.py       # 其他异步任务
+│   │
+│   ├── main/                    # 🏠 主页蓝图
+│   ├── yuque/                   # 📝 语雀集成（规划中）
+│   └── test/                    # 🧪 测试模块
+│
+├── static/                      # 静态资源（CSS/JS）
+├── templates/                   # Jinja2 模板
+├── run.py                       # Flask 应用启动入口
+├── celery_worker.py             # Celery Worker 启动脚本
+├── test_mail.py                 # 邮件功能本地测试
+├── requirements.txt             # Python 依赖清单
+└── README.md                    # 项目文档
 ```
 
 ---
 
-## 核心功能：邮件推送模块
+## 🚀 快速开始
 
-### 接口说明
+### 环境要求
 
-**端点**: `POST /api/v1/push/email`
+- Python 3.11+
+- Redis 7.x
+- SMTP 邮件服务（如 126 邮箱、QQ 邮箱等）
+
+### 1. 克隆项目
+
+```bash
+git clone https://github.com/Gu-Heping/flask_test.git
+cd flask_test
+```
+
+### 2. 创建虚拟环境并安装依赖
+
+**Windows (PowerShell):**
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+**Linux/macOS:**
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 3. 配置环境变量
+
+创建 `.env` 文件：
+
+```env
+# 应用配置
+DEBUG=True
+
+# 邮件配置
+EMAIL_PASSWORD=your_smtp_auth_code
+
+# 签名密钥（可选，留空则不启用签名验证）
+PUSH_SIGNING_SECRET=your_secret_key_here
+
+# 签名时间窗口（秒）
+PUSH_SIGNATURE_TOLERANCE=300
+```
+
+### 4. 启动 Redis
+
+**Windows:**
+```powershell
+redis-server
+```
+
+**Linux/macOS:**
+```bash
+redis-server
+```
+
+### 5. 初始化数据库
+
+```bash
+python run.py
+```
+
+首次运行会自动创建数据库表（`app.db`）。
+
+### 6. 启动 Celery Worker
+
+打开新终端窗口：
+
+**Windows:**
+```powershell
+.\venv\Scripts\Activate.ps1
+celery -A celery_worker.celery worker --loglevel=info --pool=solo
+```
+
+**Linux/macOS:**
+```bash
+source venv/bin/activate
+celery -A celery_worker.celery worker --loglevel=info
+```
+
+### 7. 启动 Flask 应用
+
+**开发环境（Windows）:**
+```powershell
+python run.py
+```
+
+然后使用 Waitress 运行（推荐用于 Windows 生产环境）：
+```powershell
+pip install waitress
+waitress-serve --host=0.0.0.0 --port=5000 run:app
+```
+
+**生产环境（Linux/macOS）:**
+```bash
+# 使用 Gunicorn（仅支持 Unix 系统）
+pip install gunicorn
+gunicorn -w 4 -b 0.0.0.0:5000 run:app
+```
+
+---
+
+## 📡 API 文档
+
+### 1. 发送邮件
+
+**接口**: `POST /api/v1/push/email`
 
 **请求头**:
 ```http
 Content-Type: application/json
-X-Timestamp: 1739820000               # 可选：Unix 时间戳（秒）
-X-Signature: sha256=<hex>             # 可选：HMAC-SHA256 签名（配置后强制校验）
+X-Timestamp: 1739820000               # 可选：Unix 时间戳（秒），启用签名时必填
+X-Signature: sha256=<hex_digest>      # 可选：HMAC-SHA256 签名，启用签名时必填
 ```
 
 **请求体**:
 ```json
 {
-  "to": "user@example.com",           // 或 ["user1@x.com", "user2@x.com"]
-  "subject": "邮件主题",
-  "content": "邮件正文（纯文本）"
+  "to": "user@example.com",           // 单个收件人（字符串）
+  "subject": "测试邮件",
+  "content": "这是一封测试邮件"
 }
 ```
 
-**响应**:
-- `202 Accepted` - 成功入队
+或批量发送：
+```json
+{
+  "to": ["user1@example.com", "user2@example.com"],  // 多个收件人（数组）
+  "subject": "批量通知",
+  "content": "重要系统更新通知"
+}
+```
+
+**成功响应** (`202 Accepted`):
+```json
+{
+  "code": "ACCEPTED",
+  "message": "邮件发送已入队",
+  "task_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "to": ["user@example.com"]
+}
+```
+
+**错误响应**:
+
+- `400 Bad Request` - 参数错误
   ```json
   {
-    "code": "ACCEPTED",
-    "message": "邮件发送已入队",
-    "task_id": "abc-123-def",
-    "to": ["user@example.com"]
+    "code": "INVALID_PARAMS",
+    "message": "必须提供 to/subject/content"
   }
   ```
-- `400 Bad Request` - 参数错误
-- `401 Unauthorized` - 签名校验失败
+- `401 Unauthorized` - 签名校验失败（启用签名时）
+  ```json
+  {
+    "code": "UNAUTHORIZED",
+    "message": "签名校验失败"
+  }
+  ```
 
-### 签名机制（可选启用）
+### 2. 查询邮件通知记录
 
-**配置环境变量**:
+**接口**: `GET /api/v1/get/email`
+
+**成功响应** (`200 OK`):
+```json
+[
+  {
+    "id": 1,
+    "subject": "测试邮件",
+    "to": "[\"user@example.com\"]",
+    "content": "这是一封测试邮件",
+    "pushed_at": "2025-10-23T10:30:00Z",
+    "status": "sent"
+  }
+]
+```
+
+---
+
+## 🔐 签名机制
+
+### 配置环境变量
+
 ```bash
 PUSH_SIGNING_SECRET=your-secret-key       # 启用签名校验
 PUSH_SIGNATURE_TOLERANCE=300              # 时间窗口（秒），默认 300
 ```
 
-**签名算法**:
+### 签名算法
+
 1. 构造签名串：`{timestamp}.{原始请求体字节}`
 2. 计算 HMAC：`HMAC_SHA256(secret, 签名串)`
 3. 发送头：`X-Signature: sha256=<十六进制摘要>`
 
-**Python 示例**:
+### Python 示例
+
 ```python
-import hmac, hashlib, time, json
+import hmac
+import hashlib
+import time
+import json
 
 secret = b'your-secret-key'
 timestamp = str(int(time.time()))
@@ -127,94 +306,21 @@ print(f"X-Timestamp: {timestamp}")
 print(f"X-Signature: sha256={sig}")
 ```
 
-### 失败重试与 DLQ
-
-- **自动重试**: 最多 5 次，指数退避（1s, 2s, 4s, ...），最大延迟 60s
-- **死信队列（DLQ）**: 达到最大重试后，任务详情写入日志（可扩展为 Redis List 或数据库）
-- **DLQ 格式**:
-  ```json
-  {
-    "subject": "邮件主题",
-    "recipients": ["user@x.com"],
-    "body": "正文（截断至 2000 字）",
-    "error": "SMTPException: ...",
-    "trace": "Traceback..."
-  }
-  ```
-
 ---
 
-## 快速开始
+## 🧪 测试
 
-### 1. 环境准备
-
-**系统要求**:
-- Python 3.10（建议）
-- Redis 6.0+（Windows 可用 Memurai 或 WSL 安装）
-
-**安装依赖**:
-```bash
-pip install -r requirements.txt
-```
-
-### 2. 配置环境变量
-
-在项目根目录创建 `.env` 文件：
-```env
-# 调试模式
-DEBUG=True
-
-# 邮件配置（126 邮箱示例，需替换为你的邮箱和授权码）
-EMAIL_PASSWORD=your-email-auth-code
-
-# 推送签名（可选）
-PUSH_SIGNING_SECRET=your-secret-key
-PUSH_SIGNATURE_TOLERANCE=300
-```
-
-### 3. 启动 Redis
-
-**Windows（Memurai）**:
-```bash
-memurai.exe
-```
-
-**Linux/macOS**:
-```bash
-redis-server
-```
-
-### 4. 启动 Flask 应用
+### 本地邮件测试
 
 ```bash
-python run.py
+python test_mail.py
 ```
 
-访问: `http://localhost:5000`
+此脚本会测试邮件配置是否正确，直接发送一封测试邮件。
 
-或者使用gunicorn
+### API 测试示例
 
-```bash
-gunicorn -w 4 -b 0.0.0.0:8000 run:app
-```
-
-### 5. 启动 Celery Worker
-
-**Windows（必须用 solo 池）**:
-```powershell
-celery -A celery_worker.celery worker -P solo --loglevel=info
-```
-
-**Linux/macOS**:
-```bash
-celery -A celery_worker.celery worker --loglevel=info
-```
-
----
-
-## API 使用示例
-
-### 示例 1: 发送邮件（无签名）
+#### 示例 1: 发送单个邮件（无签名）
 
 ```bash
 curl -X POST http://localhost:5000/api/v1/push/email \
@@ -226,305 +332,270 @@ curl -X POST http://localhost:5000/api/v1/push/email \
   }'
 ```
 
-**响应**:
+#### 示例 2: 批量发送（带签名）
+
+```python
+import hmac
+import hashlib
+import time
+import json
+import requests
+
+# 配置
+SECRET = b'your-secret-key'
+API_URL = 'http://localhost:5000/api/v1/push/email'
+
+# 构造请求体
+payload = {
+    "to": ["user1@example.com", "user2@example.com"],
+    "subject": "批量通知",
+    "content": "重要系统更新"
+}
+body = json.dumps(payload).encode('utf-8')
+timestamp = str(int(time.time()))
+
+# 生成签名
+base = f"{timestamp}.".encode('utf-8') + body
+signature = hmac.new(SECRET, base, hashlib.sha256).hexdigest()
+
+# 发送请求
+headers = {
+    'Content-Type': 'application/json',
+    'X-Timestamp': timestamp,
+    'X-Signature': f'sha256={signature}'
+}
+response = requests.post(API_URL, data=body, headers=headers)
+print(response.json())
+```
+
+---
+
+## 🔄 失败重试与 DLQ
+
+### 自动重试机制
+
+- **最多重试**: 5 次
+- **退避策略**: 指数退避（1s, 2s, 4s, 8s, 16s...）
+- **最大延迟**: 60 秒
+- **抖动**: 启用，避免惊群效应
+
+### 死信队列（DLQ）
+
+达到最大重试后，任务详情写入日志（可扩展为 Redis List 或数据库）：
+
 ```json
 {
-  "code": "ACCEPTED",
-  "message": "邮件发送已入队",
-  "task_id": "d7f8a123-...",
-  "to": ["user@example.com"]
+  "subject": "邮件主题",
+  "recipients": ["user@x.com"],
+  "body": "正文（截断至 2000 字）",
+  "error": "SMTPException: ...",
+  "trace": "Traceback..."
 }
 ```
 
-### 示例 2: 批量发送（带签名）
-
-**生成签名**（Python）:
-```python
-import hmac, hashlib, time, json, requests
-
-secret = b'your-secret-key'
-timestamp = str(int(time.time()))
-payload = {"to":["a@x.com","b@x.com"],"subject":"周报","content":"本周进展..."}
-body = json.dumps(payload).encode('utf-8')
-base = f"{timestamp}.".encode('utf-8') + body
-sig = hmac.new(secret, base, hashlib.sha256).hexdigest()
-
-resp = requests.post(
-    'http://localhost:5000/api/v1/push/email',
-    headers={
-        'Content-Type': 'application/json',
-        'X-Timestamp': timestamp,
-        'X-Signature': f'sha256={sig}'
-    },
-    json=payload
-)
-print(resp.status_code, resp.json())
-```
-
-### 示例 3: 常见错误
-
-**参数不全**:
-```json
-// 请求
-{"to": "user@x.com", "subject": "标题"}
-
-// 响应 400
-{"code": "INVALID_PARAMS", "message": "必须提供 to/subject/content"}
-```
-
-**签名校验失败**（配置 PUSH_SIGNING_SECRET 后）:
-```json
-// 响应 401
-{"code": "UNAUTHORIZED", "message": "签名校验失败"}
-```
-
-**请求过期**:
-```json
-// 响应 401
-{"code": "UNAUTHORIZED", "message": "请求已过期"}
-```
-
 ---
 
-## 配置说明
+## 🚀 生产部署
 
-### app/config.py 核心配置
+### 1. 使用数据库迁移
 
-```python
-class Config:
-    # 数据库
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///app/app.db'
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
-    # 邮件（126 邮箱）
-    MAIL_SERVER = 'smtp.126.com'
-    MAIL_PORT = 465
-    MAIL_USE_SSL = True
-    MAIL_USERNAME = 'peace0824@126.com'
-    MAIL_PASSWORD = os.environ.get('EMAIL_PASSWORD')
-    MAIL_DEFAULT_SENDER = 'peace0824@126.com'
-    
-    # Celery
-    CELERY_BROKER_URL = 'redis://localhost:6379/0'
-    CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
-    CELERY_INCLUDE = [
-        'app.tasks.email_tasks',
-        'app.tasks.other_tasks'
-    ]
-    
-    # 推送签名
-    PUSH_SIGNING_SECRET = os.environ.get('PUSH_SIGNING_SECRET', '')
-    PUSH_SIGNATURE_TOLERANCE = int(os.environ.get('PUSH_SIGNATURE_TOLERANCE', 300))
-```
-
----
-
-## 测试与验证
-
-### 本地邮件测试脚本
-
-项目根目录已提供 `test_mail.py`：
+初始化迁移：
 ```bash
-python test_mail.py
+flask db init
+flask db migrate -m "Initial migration"
+flask db upgrade
 ```
 
-成功后会打印：
-```
-邮件已发送到: user@example.com
-```
-
-### 查看 Celery 任务日志
-
-启动 Celery worker 后，控制台会显示任务执行情况：
-```
-[2025-10-18 10:30:00,123: INFO/MainProcess] Task app.tasks.email_tasks.send_email[abc-123] received
-[2025-10-18 10:30:02,456: INFO/MainProcess] 邮件已发送到: user@example.com
-[2025-10-18 10:30:02,789: INFO/MainProcess] Task app.tasks.email_tasks.send_email[abc-123] succeeded in 2.5s
+后续变更：
+```bash
+flask db migrate -m "描述本次变更"
+flask db upgrade
 ```
 
-### 失败重试验证
+### 2. 部署架构
 
-1. 故意配置错误的 SMTP 密码
-2. 发送邮件请求
-3. 观察 Celery 日志显示自动重试（1s, 2s, 4s, ...）
-4. 达到最大重试后，控制台打印 DLQ 信息：
-   ```
-   [DLQ][email] {"subject":"测试","recipients":["user@x.com"],"body":"内容","error":"SMTPException..."}
-   ```
-
----
-
-## 可扩展功能（Roadmap）
-
-### 短期（邮件模块增强）
-
-- [ ] HTML 邮件支持（已预留 `html` 参数）
-- [ ] 邮件模板系统（Jinja2 变量渲染）
-- [ ] DLQ 管理接口：
-  - `GET /api/v1/push/email/dlq` - 查询死信队列
-  - `POST /api/v1/push/email/replay` - 重投失败任务
-- [ ] 限频策略（同一收件人/主题合并发送）
-- [ ] 监控面板（Flower / Prometheus）
-
-### 中期（其他推送渠道）
-
-- [ ] Webhook 推送：`POST /api/v1/push/webhook`
-  - 支持 POST/GET/PUT 方法
-  - 自定义 Headers 与 Body
-  - 签名校验（X-Signature）
-  - 重试与 DLQ
-- [ ] RSS 订阅：`GET /api/v1/push/rss?tag=xxx`
-  - 基于 feedgen 生成 RSS/Atom
-  - 按标签/分类过滤
-
-### 长期（平台化）
-
-- [ ] 统一推送管理后台
-- [ ] 多租户支持（API Key + 配额管理）
-- [ ] Webhook 事件回调（推送成功/失败通知）
-- [ ] 批量推送优化（分片、限流、合并）
-
----
-
-## 部署建议
-
-### 生产环境配置
-
-1. **数据库**: 迁移至 PostgreSQL/MySQL
-   ```python
-   SQLALCHEMY_DATABASE_URI = 'postgresql://user:pass@localhost/dbname'
-   ```
-
-2. **Redis**: 使用持久化配置，开启 AOF
-   ```bash
-   appendonly yes
-   appendfsync everysec
-   ```
-
-3. **Celery Worker**: 使用 prefork 池（Linux）或 gevent（Windows）
-   ```bash
-   celery -A celery_worker.celery worker --pool=prefork --concurrency=4 --loglevel=info
-   ```
-
-4. **反向代理**: Nginx + Gunicorn
-   ```bash
-   gunicorn -w 4 -b 127.0.0.1:8000 run:app
-   ```
-
-5. **监控**: Flower（Celery 监控）
-   ```bash
-   celery -A celery_worker.celery flower --port=5555
-   ```
-
-### Docker 部署（推荐）
-
-```dockerfile
-# Dockerfile（示例）
-FROM python:3.11-slim
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-COPY . .
-CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "run:app"]
+**推荐架构**:
+```
+[Nginx] → [Gunicorn/Waitress] → [Flask App]
+           ↓
+        [Redis] ← [Celery Worker × N]
+           ↓
+        [PostgreSQL/MySQL]
 ```
 
-```yaml
-# docker-compose.yml（示例）
-version: '3.8'
-services:
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-  
-  web:
-    build: .
-    ports:
-      - "5000:5000"
-    env_file: .env
-    depends_on:
-      - redis
-  
-  celery:
-    build: .
-    command: celery -A celery_worker.celery worker --loglevel=info
-    env_file: .env
-    depends_on:
-      - redis
+**Windows 环境**:
+- WSGI 服务器: Waitress
+- Celery Worker: 使用 `--pool=solo`
+
+**Linux/macOS 环境**:
+- WSGI 服务器: Gunicorn
+- Celery Worker: 默认 prefork 模式
+
+### 3. 进程管理
+
+**使用 Supervisor（Linux）**:
+
+```ini
+[program:flask_app]
+command=/path/to/venv/bin/gunicorn -w 4 -b 127.0.0.1:5000 run:app
+directory=/path/to/flask_test
+user=www-data
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/flask_app.err.log
+stdout_logfile=/var/log/flask_app.out.log
+
+[program:celery_worker]
+command=/path/to/venv/bin/celery -A celery_worker.celery worker --loglevel=info
+directory=/path/to/flask_test
+user=www-data
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/celery_worker.err.log
+stdout_logfile=/var/log/celery_worker.out.log
+```
+
+### 4. Nginx 配置示例
+
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
 ```
 
 ---
 
-## 安全建议
+## 📊 监控与可观测性
 
-1. **签名密钥管理**: 使用强随机字符串，定期轮换
-   ```bash
-   python -c "import secrets; print(secrets.token_urlsafe(32))"
-   ```
+### Celery 监控
 
-2. **HTTPS 强制**: 生产环境必须使用 HTTPS，避免签名泄露
+**Flower（Celery Web 监控工具）**:
+```bash
+pip install flower
+celery -A celery_worker.celery flower --port=5555
+```
 
-3. **速率限制**: 使用 Flask-Limiter 防止 API 滥用
-   ```python
-   from flask_limiter import Limiter
-   limiter = Limiter(app, key_func=lambda: request.remote_addr)
-   @limiter.limit("10 per minute")
-   ```
+访问: `http://localhost:5555`
 
-4. **敏感数据脱敏**: 日志/DLQ 中避免记录完整邮箱地址与内容
+### 日志管理
+
+**推荐工具**:
+- **ELK Stack** (Elasticsearch + Logstash + Kibana)
+- **Grafana + Loki**
+- **Sentry** (错误追踪)
 
 ---
 
-## 常见问题
+## 🛠️ 常见问题
 
-### Q1: Windows 上 Celery 启动失败？
-**A**: Windows 必须使用 `solo` 或 `gevent` 池：
+### Q1: Windows 启动 Celery 报错？
+
+**A**: Windows 不支持默认的 prefork 模式，使用：
 ```powershell
-celery -A celery_worker.celery worker -P solo --loglevel=info
+celery -A celery_worker.celery worker --pool=solo --loglevel=info
 ```
 
-### Q2: 邮件发送失败但无报错？
-**A**: 检查：
-1. 环境变量 `EMAIL_PASSWORD` 是否设置
-2. 邮箱是否开启 SMTP 服务并获取授权码
-3. Celery worker 是否正常运行
-4. 查看 Celery 日志是否有异常
+### Q2: 邮件发送失败？
 
-### Q3: 签名校验总是失败？
-**A**: 排查：
-1. 客户端与服务端 `PUSH_SIGNING_SECRET` 是否一致
-2. 时间戳是否在 300 秒窗口内
-3. 签名串构造是否正确（`{timestamp}.{原始body字节}`）
-4. 是否使用了相同的哈希算法（HMAC-SHA256）
+**A**: 检查以下配置：
+1. SMTP 服务器地址和端口
+2. 邮箱授权码（不是登录密码）
+3. 防火墙是否阻止 SMTP 端口（465/587）
+4. Redis 是否正常运行
 
-### Q4: 如何禁用签名校验？
-**A**: 不设置 `PUSH_SIGNING_SECRET` 环境变量即可，接口会跳过签名验证。
+### Q3: 如何切换到 PostgreSQL？
 
----
+**A**: 修改 `app/config.py`：
+```python
+SQLALCHEMY_DATABASE_URI = 'postgresql://user:password@localhost/dbname'
+```
 
-## 贡献指南
+安装驱动：
+```bash
+pip install psycopg2-binary
+```
 
-本人负责邮件模块，欢迎提交 Issue 和 PR：
+### Q4: 如何禁用签名验证？
 
-- **Bug 修复**: 邮件发送异常、重试逻辑问题等
-- **功能增强**: HTML 邮件、模板系统、DLQ 管理等
-- **文档完善**: API 示例、配置说明、部署指南等
+**A**: 删除或留空 `.env` 文件中的 `PUSH_SIGNING_SECRET`。
 
 ---
 
-## 许可证
+## 🔐 安全最佳实践
 
-MIT License
-
----
-
-## 联系方式
-
-- **项目负责**: 邮件推送模块
-- **技术栈**: Flask + Celery + Redis + Flask-Mailing
-- **当前状态**: ✅ 核心功能已完成，可扩展开发中
+1. **签名验证**: 生产环境务必启用 `PUSH_SIGNING_SECRET`
+2. **环境变量**: 敏感信息（邮箱密码、签名密钥）使用 `.env` 文件管理，不要提交到版本控制
+3. **HTTPS**: 生产环境使用 HTTPS + Nginx 反向代理
+4. **速率限制**: 使用 Flask-Limiter 添加接口限流
+5. **日志审计**: 记录所有 API 调用和失败任务
 
 ---
 
-**更新日期**: 2025-10-18  
-**文档版本**: v1.0.0
+## 🗺️ Roadmap
+
+- [x] 邮件推送功能
+- [x] 异步任务队列
+- [x] 签名验证机制
+- [x] 失败重试 & DLQ
+- [ ] 短信推送模块
+- [ ] 微信/钉钉通知
+- [ ] 推送模板系统
+- [ ] 用户权限管理
+- [ ] Web 管理后台
+- [ ] Docker 容器化
+- [ ] 性能监控仪表盘
+
+---
+
+## 📄 许可证
+
+本项目基于 [MIT License](LICENSE) 开源。
+
+---
+
+## 🤝 贡献指南
+
+欢迎提交 Issue 和 Pull Request！
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 打开 Pull Request
+
+---
+
+## 👨‍💻 作者
+
+**Gu-Heping**
+
+- GitHub: [@Gu-Heping](https://github.com/Gu-Heping)
+- 项目链接: [flask_test](https://github.com/Gu-Heping/flask_test)
+
+---
+
+## 🙏 致谢
+
+感谢以下开源项目：
+
+- [Flask](https://flask.palletsprojects.com/) - Web 框架
+- [Celery](https://docs.celeryproject.org/) - 分布式任务队列
+- [Redis](https://redis.io/) - 高性能内存数据库
+- [Flask-Mailing](https://github.com/waynerv/flask-mailing) - 异步邮件发送
+
+---
+
+<div align="center">
+  
+**⭐ 如果这个项目对你有帮助，请给个 Star！**
+
+</div>
