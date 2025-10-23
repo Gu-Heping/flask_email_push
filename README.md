@@ -6,7 +6,7 @@
 [![Redis](https://img.shields.io/badge/Redis-7.x-red.svg)](https://redis.io/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> 基于 Flask + Celery + Redis 的企业级异步消息推送平台
+> 基于 Flask + Celery + Redis 的异步消息推送平台
 
 ---
 
