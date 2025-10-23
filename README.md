@@ -149,12 +149,12 @@ print(f"X-Signature: sha256={sig}")
 ### 1. 环境准备
 
 **系统要求**:
-- Python 3.9+
+- Python 3.10（建议）
 - Redis 6.0+（Windows 可用 Memurai 或 WSL 安装）
 
 **安装依赖**:
 ```bash
-pip install flask flask-sqlalchemy flask-migrate flask-mailing celery redis python-dotenv flask-restful
+pip install -r requirements.txt
 ```
 
 ### 2. 配置环境变量
