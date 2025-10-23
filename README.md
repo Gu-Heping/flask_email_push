@@ -192,6 +192,12 @@ python run.py
 
 访问: `http://localhost:5000`
 
+或者使用gunicorn
+
+```bash
+gunicorn -w 4 -b 0.0.0.0:8000 run:app
+```
+
 ### 5. 启动 Celery Worker
 
 **Windows（必须用 solo 池）**:

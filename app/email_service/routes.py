@@ -6,9 +6,29 @@ from werkzeug.exceptions import BadRequest
 import hashlib
 import hmac
 import time
+from datetime import datetime, timezone  # 导入处理时间的模块
+from flask_restful import Resource, Api, reqparse, inputs  # 导入 Flask-RESTful 的资源和 API 类以及请求解析器
+from app.extensions import db  # 导入数据库对象
 
 from app.tasks.email_tasks import send_email  # 导入邮件任务
+from .models import EmailNotification  # 导入 EmailNotification 模型
 
+# 初始化 Flask-RESTful 的 API 对象，并传入蓝图对象
+# 注意：API 是绑定到蓝图 (email_bp) 上的
+api = Api(email_bp)
+
+# 获取当前UTC时间的函数
+def get_current_utc():
+    return datetime.now(timezone.utc)
+
+@email_bp.route('/get/email', methods=['GET'])
+def get_email():
+    """
+    获取所有邮件通知接口
+    GET /api/v1/get/email
+    """
+    notifications = EmailNotification.query.all()
+    return jsonify([n.to_dict() for n in notifications]), 200 
 
 @email_bp.route('/push/email', methods=['POST'])
 def push_email():
@@ -68,6 +88,13 @@ def push_email():
     digest = hmac.new(secret, base, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(req_sig.replace('sha256=', ''), digest):
       return jsonify({"code": "UNAUTHORIZED", "message": "签名校验失败"}), 401
+
+  pushed_at = get_current_utc()
+  # 序列化收件人列表为 JSON 字符串以存储
+  import json
+  notif = EmailNotification(subject=subject, to=json.dumps(recipients, ensure_ascii=False), content=content, pushed_at=pushed_at)
+  db.session.add(notif)
+  db.session.commit()
 
   # 入队 Celery 任务
   async_result = send_email.delay(subject=subject, recipients=recipients, body=content)
