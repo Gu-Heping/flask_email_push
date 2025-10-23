@@ -7,7 +7,6 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > 注：该项目文档由ai生成，如有问题可以直接来找我，另外现在该项目正运行在http://172.17.158.90:8000上，可以直接调用相关接口进行测试。
-> 基于 Flask + Celery + Redis 的异步消息推送平台
 
 ---
 
