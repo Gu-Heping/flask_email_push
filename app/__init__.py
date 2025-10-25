@@ -2,7 +2,10 @@
 from flask import Flask  # 导入Flask类
 # from flask_socketio import SocketIO  # 导入Flask-SocketIO扩展
 from .config import Config  # 导入配置类
-from .extensions import db, migrate, mail  # 导入数据库扩展
+
+# 初始化扩展
+# 分别导入数据库、迁移、邮件和Bootstrap扩展
+from .extensions import db, migrate, mail, bootstrap, csrf
 
 # from .auth import auth_bp    # 导入蓝图
 # from .yuque import yuque_bp
@@ -12,6 +15,8 @@ from .extensions import db, migrate, mail  # 导入数据库扩展
 from celery import Celery
 
 celery = Celery()  # 全局 Celery 实例
+
+
 
 def make_celery(app):
     """使用 Flask 配置初始化 Celery，并为任务提供应用上下文。"""
@@ -33,6 +38,8 @@ def make_celery(app):
                 return TaskBase.__call__(self, *args, **kwargs)
     celery.Task = ContextTask
 
+    app.config['EXPLAIN_TEMPLATE_LOADING'] = True
+
     # 将本 Celery 应用设为默认应用，保证 @shared_task 在 Web 进程中也使用该实例
     try:
         celery.set_default()
@@ -44,7 +51,11 @@ def make_celery(app):
 
 def create_app(config_class=Config):
     #  创建Flask应用实例
-    app = Flask(__name__)
+    import os
+    # 指定模板和静态文件夹在项目根目录
+    template_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'templates')
+    static_folder = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'static')
+    app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
     
     # 加载配置（先）
     app.config.from_object(config_class)
@@ -58,6 +69,11 @@ def create_app(config_class=Config):
     # 以确保 @shared_task 绑定到我们配置的 Celery 实例（使用 Redis，而非默认 AMQP）。
     make_celery(app)
 
+    # 初始化 Bootstrap
+    bootstrap.init_app(app)
+
+    # 初始化 CSRF 保护
+    csrf.init_app(app)
 
     # 导入并注册主页蓝图
     from .main import main_bp
@@ -70,6 +86,10 @@ def create_app(config_class=Config):
     # 导入并注册邮件蓝图
     from .email_service import email_bp
     app.register_blueprint(email_bp, url_prefix='/api/v1')
+
+    # 导入邮件发送蓝图
+    from .email_push import email_push_bp
+    app.register_blueprint(email_push_bp, url_prefix='/email_push')
 
     # 返回应用实例
     return app

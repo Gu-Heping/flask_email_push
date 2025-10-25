@@ -8,7 +8,7 @@
 <body>
   <nav class="navbar navbar-expand-lg navbar-light bg-light">
     <div class="container-fluid">
-      <a class="navbar-brand" href="#">邮件推送平台（测试中）</a>
+      <a class="navbar-brand" href="#">邮件推送平台</a>
     </div>
   </nav>
 
@@ -16,14 +16,16 @@
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
+
           <div class="alert alert-{{ category }}">{{ message }}</div>
         {% endfor %}
       {% endif %}
     {% endwith %}
     {% block content %}{% endblock %}
-    {% block scripts %}{% endblock %}
   </div>
 
   {{ bootstrap.load_js() }}
 </body>
 </html>
+
+

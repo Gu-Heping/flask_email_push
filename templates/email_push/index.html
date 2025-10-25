@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% import 'bootstrap5/form.html' as wtf %}
+
+{% block content %}
+  {{ wtf.render_form(form, action=url_for('email.push_email'), id="emailPushForm")}}
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

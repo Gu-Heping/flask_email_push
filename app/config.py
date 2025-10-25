@@ -10,6 +10,9 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 class Config:  # 设置基础配置
     
+    # 应用密钥
+    SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key")
+
     # copilot写的很健壮的设置布尔模式的代码
     DEBUG = os.environ.get("DEBUG", "False").lower() in ("true", "1", "t")  # 是否开启调试模式，默认关闭
 
@@ -42,6 +45,9 @@ class Config:  # 设置基础配置
     # 可选：签名时间戳允许的偏差（秒），用于防重放攻击
     PUSH_SIGNATURE_TOLERANCE = int(os.environ.get("PUSH_SIGNATURE_TOLERANCE", 300))
 
-    # SQLALCHEMY_TRACK_MODIFICATIONS = False  # 关闭对象修改追踪，提高性能
+    # CSRF 保护
+    WTF_CSRF_SECRET_KEY = SECRET_KEY
+    
+
 
     
